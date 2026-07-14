@@ -1,6 +1,8 @@
-// 対象3路線のモックデータ（駅・区間・時間帯別 推定混雑率）
-// ⚠️ これは実測ではなく「デモ用の推定値」。実データ（国交省 混雑率 × 時刻表係数 × 遅延補正）へ
-//    差し替えるまでのプレースホルダ。UI では必ず「デモデータ」「推定です」と明示する。
+// 対象3路線の駅・区間定義（正本）。
+// ⚠️ ここは「駅リスト・区間の並び・区間ごとの相対差（peakRate）」の定義に徹する。
+//    時間帯別の推定混雑率は lib/data/estimate-lines.ts が国交省の実混雑率（baseline.ts）
+//    × 推定エンジン（lib/congestion/estimate.ts）で算出する（この定義を素材として使う）。
+//    peakRate は実測ではなく、区間ごとの相対差を表す暫定按分ウェイトの素材。
 
 export interface MockStation {
   /** 表示名（日本語） */
@@ -11,10 +13,8 @@ export interface MockSegment {
   id: string;
   fromStation: string;
   toStation: string;
-  /** 朝ピーク時の推定混雑率(%)。この値を時間帯係数で按分して 24 時間分を生成する */
+  /** 区間ごとの相対的な混雑度合い（%相当）。最混雑区間=1.0 に正規化して按分ウェイトに使う。 */
   peakRate: number;
-  /** 0〜23 時の推定混雑率(%)。index = 時 */
-  hourly: number[];
 }
 
 export interface MockLine {
@@ -29,21 +29,6 @@ export interface MockLine {
   segments: MockSegment[];
 }
 
-// 時間帯係数：ピーク(朝8時)=1.00 を基準にした相対カーブ。
-// 朝 7〜9 時・夕 17〜19 時が山、深夜と昼が谷、という現実的な通勤カーブ。
-// index = 時(0〜23)
-const HOURLY_FACTOR: readonly number[] = [
-  0.2, 0.15, 0.12, 0.14, 0.22, 0.42, // 0〜5 時（終電〜始発前後）
-  0.72, 0.94, 1.0, 0.86, 0.6, 0.54, // 6〜11 時（朝ピーク）
-  0.56, 0.53, 0.5, 0.54, 0.66, 0.86, // 12〜17 時（昼の谷 → 夕方立ち上がり）
-  0.95, 0.78, 0.6, 0.46, 0.36, 0.26, // 18〜23 時（夕ピーク → 減衰）
-];
-
-/** ピーク混雑率から 24 時間分の推定カーブを生成（純関数・副作用なし） */
-function buildHourly(peakRate: number): number[] {
-  return HOURLY_FACTOR.map((f) => Math.round(peakRate * f));
-}
-
 interface SegmentSeed {
   from: string;
   to: string;
@@ -56,7 +41,6 @@ function buildSegments(lineId: string, seeds: SegmentSeed[]): MockSegment[] {
     fromStation: s.from,
     toStation: s.to,
     peakRate: s.peakRate,
-    hourly: buildHourly(s.peakRate),
   }));
 }
 
@@ -145,26 +129,4 @@ export const MOCK_LINES: readonly MockLine[] = [
 
 export function getLine(lineId: string): MockLine | undefined {
   return MOCK_LINES.find((l) => l.id === lineId);
-}
-
-export interface ComfortableHour {
-  hour: number;
-  rate: number;
-}
-
-/**
- * 指定区間で「空いている時間帯 トップ N」を返す（純関数）。
- * 深夜早朝（0〜4時）は実用的な通勤時間ではないため除外し、始発以降の快適な時間帯を提案する。
- */
-export function topComfortableHours(
-  segment: MockSegment,
-  count = 3,
-  fromHour = 5,
-  toHour = 23
-): ComfortableHour[] {
-  return segment.hourly
-    .map((rate, hour) => ({ hour, rate }))
-    .filter((h) => h.hour >= fromHour && h.hour <= toHour)
-    .sort((a, b) => a.rate - b.rate)
-    .slice(0, count);
 }

@@ -3,7 +3,7 @@
 // 「今」の時間帯の列をハイライトし、行クリックで区間を選択する。
 "use client";
 
-import type { MockLine } from "@/lib/mock/lines";
+import type { EstimatedLine } from "@/lib/data/estimate-lines";
 import { rateInfo } from "@/lib/mock/congestion";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -14,7 +14,7 @@ export function CongestionHeatmap({
   selectedSegmentId,
   onSelectSegment,
 }: {
-  line: MockLine;
+  line: EstimatedLine;
   currentHour: number | null;
   selectedSegmentId: string;
   onSelectSegment: (id: string) => void;
@@ -26,7 +26,7 @@ export function CongestionHeatmap({
           区間 × 時間帯の推定混雑
         </h2>
         <p className="text-[11px] text-gray-400">
-          数値は推定混雑率(%)／横スクロールで全時間帯
+          数値は国交省統計に基づく推定混雑率(%)／横スクロールで全時間帯
         </p>
       </div>
 
@@ -96,7 +96,8 @@ export function CongestionHeatmap({
       </div>
 
       <p className="px-4 py-2 text-[11px] text-gray-400">
-        黒枠＝「今」の時間帯／行をタップすると下に時間帯グラフを表示します
+        黒枠＝「今」の時間帯（遅延補正あり）／行をタップすると下に時間帯グラフを表示します
+        区間ごとの差は暫定の按分です
       </p>
     </div>
   );

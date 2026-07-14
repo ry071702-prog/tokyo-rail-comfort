@@ -2,23 +2,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MOCK_LINES, getLine } from "@/lib/mock/lines";
-import type { TrainInfoResponse } from "@/lib/mock/train-information";
+import {
+  ESTIMATED_LINES,
+  getEstimatedLine,
+  type EstimatedLine,
+} from "@/lib/data/estimate-lines";
+import { parseDelayMinutes } from "@/lib/data/parse-delay";
+import type {
+  TrainInfoItem,
+  TrainInfoResponse,
+} from "@/lib/mock/train-information";
 import { ServiceStatusBanner } from "@/components/ServiceStatusBanner";
 import { CongestionHeatmap } from "@/components/CongestionHeatmap";
 import { SegmentTimebandChart } from "@/components/SegmentTimebandChart";
 import { CongestionLegend } from "@/components/CongestionLegend";
 
+// 運行情報アイテムが対象路線のものか（路線名 or 事業者コードで突き合わせ）。
+function matchesLine(item: TrainInfoItem, line: EstimatedLine): boolean {
+  if (item.railwayLabel && item.railwayLabel === line.name) return true;
+  return item.operator === line.operator;
+}
+
 export function ComfortDashboard() {
-  const [lineId, setLineId] = useState<string>(MOCK_LINES[0].id);
+  const [lineId, setLineId] = useState<string>(ESTIMATED_LINES[0].id);
   const [segmentId, setSegmentId] = useState<string>(
-    MOCK_LINES[0].segments[0].id
+    ESTIMATED_LINES[0].segments[0].id
   );
   const [currentHour, setCurrentHour] = useState<number | null>(null);
   const [trainInfo, setTrainInfo] = useState<TrainInfoResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const line = getLine(lineId) ?? MOCK_LINES[0];
+  // 選択路線の遅延分数（運行情報の異常アイテムから最大値を採る）。0 なら補正なし。
+  const delayMinutes = useMemo(() => {
+    if (!trainInfo) return 0;
+    const base = ESTIMATED_LINES.find((l) => l.id === lineId);
+    if (!base) return 0;
+    return trainInfo.items
+      .filter((i) => !i.normal && matchesLine(i, base))
+      .reduce((max, i) => Math.max(max, parseDelayMinutes(i.text)), 0);
+  }, [trainInfo, lineId]);
+
+  // 実データ由来の推定ライン。「今」の時間帯セルにのみ遅延補正を反映する。
+  const line = useMemo(
+    () =>
+      getEstimatedLine(lineId, { nowHour: currentHour, delayMinutes }) ??
+      ESTIMATED_LINES[0],
+    [lineId, currentHour, delayMinutes]
+  );
   const segment =
     line.segments.find((s) => s.id === segmentId) ?? line.segments[0];
 
@@ -65,13 +95,13 @@ export function ComfortDashboard() {
 
   const handleSelectLine = (id: string) => {
     setLineId(id);
-    const next = getLine(id);
+    const next = ESTIMATED_LINES.find((l) => l.id === id);
     if (next) setSegmentId(next.segments[0].id);
   };
 
   const lineButtons = useMemo(
     () =>
-      MOCK_LINES.map((l) => {
+      ESTIMATED_LINES.map((l) => {
         const active = l.id === lineId;
         return (
           <button

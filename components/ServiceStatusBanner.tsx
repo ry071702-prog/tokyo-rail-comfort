@@ -2,7 +2,7 @@
 // モック時は「デモデータ」を明示。ライセンス要件のため出典・データ生成時刻を必ず出す。
 "use client";
 
-import type { MockLine } from "@/lib/mock/lines";
+import type { EstimatedLine } from "@/lib/data/estimate-lines";
 import type { TrainInfoItem, TrainInfoResponse } from "@/lib/mock/train-information";
 import { DemoBadge } from "@/components/DemoBadge";
 
@@ -19,7 +19,7 @@ function formatJst(iso: string): string {
   }).format(d);
 }
 
-function matchesLine(item: TrainInfoItem, line: MockLine): boolean {
+function matchesLine(item: TrainInfoItem, line: EstimatedLine): boolean {
   if (item.railwayLabel && item.railwayLabel === line.name) return true;
   return item.operator === line.operator;
 }
@@ -31,7 +31,7 @@ export function ServiceStatusBanner({
 }: {
   data: TrainInfoResponse | null;
   loading: boolean;
-  line: MockLine;
+  line: EstimatedLine;
 }) {
   if (loading && !data) {
     return (

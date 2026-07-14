@@ -9,8 +9,8 @@ dist/
 .env.local
 .env*.local
 
-# 手動DLした元データ（混雑率PDF等）はコミットしない
-data/
+# 手動DLした元データ（混雑率PDF等）はコミットしない (ルート直下のみ  lib/data/ は対象外)
+/data/
 
 # misc
 .DS_Store

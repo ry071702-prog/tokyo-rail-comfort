@@ -2,8 +2,11 @@
 // 「この区間、空いているのは何時か」に答えるビュー。
 "use client";
 
-import type { MockLine, MockSegment } from "@/lib/mock/lines";
-import { topComfortableHours } from "@/lib/mock/lines";
+import type {
+  EstimatedLine,
+  EstimatedSegment,
+} from "@/lib/data/estimate-lines";
+import { topComfortableHours } from "@/lib/data/estimate-lines";
 import { rateInfo } from "@/lib/mock/congestion";
 
 const SCALE_MAX = 210; // バー高さの上限スケール(%)
@@ -13,8 +16,8 @@ export function SegmentTimebandChart({
   segment,
   currentHour,
 }: {
-  line: MockLine;
-  segment: MockSegment;
+  line: EstimatedLine;
+  segment: EstimatedSegment;
   currentHour: number | null;
 }) {
   const best = topComfortableHours(segment, 3);
