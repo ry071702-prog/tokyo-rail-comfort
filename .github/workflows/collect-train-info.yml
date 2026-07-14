@@ -1,0 +1,41 @@
+# 運行情報（遅延）履歴の定期収集 — Phase2 の推定補正較正用データを蓄積する。
+# 月額 ¥0 構成: GitHub Actions cron + Supabase 無料枠。
+#
+# ⚠️ Secrets 未設定の間は失敗する。キー設定後に有効化すること。
+# 当面は誤作動防止のため vars.COLLECT_ENABLED == 'true' のときだけ実行する。
+#
+# 有効化手順:
+#   1. リポジトリ Settings > Secrets and variables > Actions で Secrets を登録:
+#      ODPT_CONSUMER_KEY / NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+#   2. 同画面の Variables タブで COLLECT_ENABLED = true を登録
+#   3. 手動確認は Actions タブから workflow_dispatch で実行
+name: collect-train-info
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # 10 分ごと
+  workflow_dispatch: {}
+
+# 多重起動防止（前回実行中なら待機せずスキップ）
+concurrency:
+  group: collect-train-info
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    # COLLECT_ENABLED を立てるまでは実行しない（誤作動ガード）
+    if: vars.COLLECT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run collect:train-info
+        env:
+          ODPT_CONSUMER_KEY: ${{ secrets.ODPT_CONSUMER_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
