@@ -14,32 +14,33 @@
 - [x] `pnpm lint` / `pnpm build` が通る（npm 使用）
 - **AC**: トップページが起動し、Supabase クライアントが env から初期化される。
 
-## M1. データモデル構築
-- [ ] `supabase/schema.sql` を Supabase に適用（migrations 化）
+## M1. データモデル構築 ← ⛔ ODPTキー + Supabaseプロジェクトの設定待ち (スクリプトは準備済)
+- [x] `supabase/schema.sql` を Supabase に適用（migrations 化）※適用実行は Supabase 作成後
 - [ ] 対象路線を決めて `railways` / `stations` / `segments` にシード投入
-      （推奨初期3路線：JR山手線・JR中央快速線・東京メトロ東西線。まず1路線でも可）
-- [ ] 駅座標・駅順は ODPT `odpt:Station` / `odpt:Railway` から取得して投入
+      → `npm run seed:master` 準備済（山手・中央快速・東西）。キー設定後に実行
+- [ ] 駅座標・駅順は ODPT `odpt:Station` / `odpt:Railway` から取得して投入（同上）
 - **AC**: DB に対象路線の駅・区間が入り、Supabase から取得できる。
 
 ## M2. ODPT リアルタイム連携
-- [ ] `lib/odpt/` に fetch クライアント（型定義 + `consumerKey` はサーバ側）
-- [ ] `app/api/train-information/route.ts` を作成：`odpt:TrainInformation` を叩き、30–60秒キャッシュ、`dc:date` を含めて返す
-- [ ] 対象路線の遅延・運休を取得して表示できる
+- [x] `lib/odpt/` に fetch クライアント（型定義 + `consumerKey` はサーバ側）
+- [x] `app/api/train-information/route.ts` を作成：`odpt:TrainInformation` を叩き、30–60秒キャッシュ、`dc:date` を含めて返す（キー未設定時はモックにフォールバック）
+- [ ] 対象路線の遅延・運休を取得して表示できる ※実データ確認はキー設定後
 - **AC**: 現在の運行情報がUIに出て、データ生成時刻(`dc:date`)と出典表示が付く。
 
-## M3. 混雑推定モデル
-- [ ] 国交省 混雑率PDF（最新年度・対象路線分）を `data/` に配置
-- [ ] `scripts/import-congestion.ts` でPDFをパースし `congestion_baseline` に投入
-- [ ] `odpt:StationTimetable` から時間帯別本数を集計し `timeband_factor` に投入するスクリプト
-- [ ] `lib/congestion/estimate.ts` に純関数で推定ロジックを実装（+ 単体テスト）
+## M3. 混雑推定モデル ✅ (投入実行のみSupabase待ち)
+- [x] 国交省 混雑率PDF（最新年度・対象路線分）を `data/` に配置（令和6年度 資料2・3）
+- [x] `scripts/import-congestion.ts`：PDFから構造化した `supabase/seed/congestion_baseline_2024.csv` を投入（実行はSupabase作成後）
+- [x] `odpt:StationTimetable` から時間帯別本数を集計し `timeband_factor` に投入するスクリプト（`npm run seed:timeband`、実行はキー設定後）
+- [x] `lib/congestion/estimate.ts` に純関数で推定ロジックを実装（+ 単体テスト27件）
       `推定 = ベース混雑率 × 時間帯係数 × 曜日係数 × リアルタイム補正`
-- **AC**: 区間・時刻・曜日・遅延を渡すと 0–1 の推定値と5段階レベルが返り、テストが通る。
+- **AC**: 区間・時刻・曜日・遅延を渡すと 0–1 の推定値と5段階レベルが返り、テストが通る。✅
 
-## M4. 可視化UI（MVPの核）
-- [ ] 区間×時間帯の推定混雑を色で表示（一覧 or 簡易路線図）
-- [ ] 「今」の推定＋リアルタイム補正を反映
-- [ ] 「この区間、空いているのは何時か」の時間帯ビュー/提案を1つ
-- [ ] 「推定です」注記・出典・`dc:date` を全画面で担保
+## M4. 可視化UI（MVPの核）— モックデータで一通り動作、実データ差し替え待ち
+- [x] 区間×時間帯の推定混雑を色で表示（一覧 or 簡易路線図）※現状モックデータ
+- [x] 「今」の推定＋リアルタイム補正を反映（運行情報バナー + 今の時間帯ハイライト）
+- [x] 「この区間、空いているのは何時か」の時間帯ビュー/提案を1つ（バーチャート + トップ3提案）
+- [x] 「推定です」注記・出典・`dc:date` を全画面で担保
+- [ ] モックデータを実データ（Supabase + estimate.ts）に差し替え ← 次の実装タスク
 - **AC**: CLAUDE.md の Definition of Done（可視化・提案・注記）を満たす。
 
 ## M5. デプロイ
