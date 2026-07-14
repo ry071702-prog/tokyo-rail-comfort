@@ -1,0 +1,22 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+
+# env
+.env
+.env.local
+.env*.local
+
+# 手動DLした元データ（混雑率PDF等）はコミットしない
+data/
+
+# misc
+.DS_Store
+*.log
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
