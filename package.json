@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "seed:master": "tsx scripts/seed-master.ts",
-    "seed:congestion": "tsx scripts/import-congestion.ts"
+    "seed:congestion": "tsx scripts/import-congestion.ts",
+    "seed:timeband": "tsx scripts/import-timeband.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.1",
