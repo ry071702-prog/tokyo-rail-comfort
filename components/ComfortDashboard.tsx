@@ -2,8 +2,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { DayKind } from "@/lib/congestion/estimate";
 import {
   ESTIMATED_LINES,
+  currentDayKind,
   getEstimatedLine,
   type EstimatedLine,
 } from "@/lib/data/estimate-lines";
@@ -29,6 +31,10 @@ export function ComfortDashboard() {
     ESTIMATED_LINES[0].segments[0].id
   );
   const [currentHour, setCurrentHour] = useState<number | null>(null);
+  // 曜日種別も「今」と同じくクライアントで決める
+  // サーバ側 (静的プリレンダ) の初期値は weekday 固定にしないと、ビルドした曜日が
+  // 焼き込まれて休日に見たとき平日の値が出る + ハイドレーション不一致になる
+  const [dayKind, setDayKind] = useState<DayKind>("weekday");
   const [trainInfo, setTrainInfo] = useState<TrainInfoResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -45,14 +51,17 @@ export function ComfortDashboard() {
   // 実データ由来の推定ライン。「今」の時間帯セルにのみ遅延補正を反映する。
   const line = useMemo(
     () =>
-      getEstimatedLine(lineId, { nowHour: currentHour, delayMinutes }) ??
-      ESTIMATED_LINES[0],
-    [lineId, currentHour, delayMinutes]
+      getEstimatedLine(lineId, {
+        dayKind,
+        nowHour: currentHour,
+        delayMinutes,
+      }) ?? ESTIMATED_LINES[0],
+    [lineId, dayKind, currentHour, delayMinutes]
   );
   const segment =
     line.segments.find((s) => s.id === segmentId) ?? line.segments[0];
 
-  // 「今」の時間帯はクライアントで決める（SSR とのハイドレーション不一致を避ける）
+  // 「今」の時間帯と曜日種別はクライアントで決める（SSR とのハイドレーション不一致を避ける）
   useEffect(() => {
     const update = () => {
       const jstHour = Number(
@@ -63,6 +72,7 @@ export function ComfortDashboard() {
         }).format(new Date())
       );
       setCurrentHour(jstHour % 24);
+      setDayKind(currentDayKind());
     };
     update();
     const id = window.setInterval(update, 60_000);

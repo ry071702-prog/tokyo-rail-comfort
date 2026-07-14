@@ -36,6 +36,30 @@ export interface OdptStation {
   "dc:date"?: string;
 }
 
+/** 駅別乗降人員の年度別レコード（odpt:PassengerSurvey の1要素）。 */
+export interface OdptPassengerSurveyObject {
+  /** 調査年度（西暦）。 */
+  "odpt:surveyYear": number;
+  /** 1日平均の乗降人員（人）。事業者により定義が異なる（JR東日本は乗車人員）。 */
+  "odpt:passengerJourneys": number;
+}
+
+/**
+ * 駅別乗降人員（odpt:PassengerSurvey）。
+ * 1リソースが駅（複数駅の共用がありうるため odpt:station は配列）に対応し、
+ * 年度別の実績を odpt:passengerSurveyObject に持つ。提供のない事業者・駅もある。
+ */
+export interface OdptPassengerSurvey {
+  "@id": string;
+  "owl:sameAs": string;
+  "dc:date"?: string;
+  "odpt:operator": string;
+  /** 対象駅（例: odpt.Station:JR-East.Yamanote.Shinjuku）。 */
+  "odpt:station"?: string[];
+  "odpt:railway"?: string[];
+  "odpt:passengerSurveyObject"?: OdptPassengerSurveyObject[];
+}
+
 export interface OdptTrainInformation {
   "@id": string;
   "owl:sameAs": string;

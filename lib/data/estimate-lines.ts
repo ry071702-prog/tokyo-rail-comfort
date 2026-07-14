@@ -1,20 +1,25 @@
 // 実データ由来の推定ライン。
 // 国交省の実混雑率（baseline.ts）× 推定エンジン（lib/congestion/estimate.ts）で
-// 区間×時間帯の推定混雑率を生成する。モックの作り物 peakRate は「区間ごとの相対差」
-// を表す暫定按分ウェイトとしてのみ流用する。
+// 区間×時間帯の推定混雑率を生成する。
 //
 // 推定混雑率(%) = ベース混雑率(路線, 国交省) × 区間ウェイト × 時間帯係数 × 曜日係数 × 遅延補正
 //   ベース混雑率  … baseline.ts（国交省 令和6年度 混雑率調査の路線最大値）
-//   区間ウェイト  … 現行モックの区間 peakRate 比（最混雑区間=1.0 に正規化）※暫定
+//   区間ウェイト  … 2段構え（下記 weightSource）
+//     "passengers"  … 駅別乗降人員（オープンデータ）から算出（segment-weight.ts  本命）
+//     "provisional" … 乗降人員が未取得の間の暫定按分＝モックの区間 peakRate 比 ※作り物
 //   時間帯係数    … HOURLY_FACTOR（暫定カーブ）※ODPT時刻表で置換予定
 //   曜日係数/遅延 … estimateCongestion 内部（lib/congestion/estimate.ts）
+//
+// ⚠️ import は相対パス（vitest に alias 設定が無いためテストから直接読めるようにする）
 
+import { estimateCongestion, type DayKind } from "../congestion/estimate";
+import { MOCK_LINES, type MockLine } from "../mock/lines";
+import { baselineRateForRailway } from "./baseline";
+import { getPassengers } from "./passengers";
 import {
-  estimateCongestion,
-  type DayKind,
-} from "@/lib/congestion/estimate";
-import { MOCK_LINES, type MockLine } from "@/lib/mock/lines";
-import { baselineRateForRailway } from "@/lib/data/baseline";
+  hasPassengerData,
+  segmentWeightsFromPassengers,
+} from "./segment-weight";
 
 // 時間帯係数：ピーク(朝8時)=1.00 を基準にした相対カーブ。index = 時(0〜23)。
 // ⚠️ 暫定カーブ。ODPT `odpt:StationTimetable` 由来の timeband_factor（時間帯別本数）で
@@ -36,12 +41,15 @@ const LINE_RAILWAY_ID: Record<string, string> = {
 // baseline.ts に該当行が無い路線の保険値（%）。基本は国交省値を使う。
 const FALLBACK_BASELINE_RATE = 150;
 
+/** 区間ウェイトの出典。UI の但し書き切り替えに使う。 */
+export type WeightSource = "passengers" | "provisional";
+
 /** 推定済みの区間（区間×時間帯の推定混雑率を持つ）。 */
 export interface EstimatedSegment {
   id: string;
   fromStation: string;
   toStation: string;
-  /** 暫定按分ウェイト（最混雑区間=1.0）。ODPT時刻表・実測が入るまでの暫定値。 */
+  /** 按分ウェイト（最混雑区間=1.0）。出典は EstimatedLine.weightSource を参照。 */
   weight: number;
   /** この区間のベース混雑率(%) = 路線ベース × weight。 */
   baselineRatePct: number;
@@ -61,6 +69,8 @@ export interface EstimatedLine {
   stations: readonly { name: string }[];
   /** 路線ベース混雑率(%) = 国交省 baseline.ts の路線最大値。 */
   baselineRatePct: number;
+  /** 区間ウェイトの出典（passengers=駅別乗降人員 / provisional=モック peakRate 比の暫定按分）。 */
+  weightSource: WeightSource;
   segments: EstimatedSegment[];
 }
 
@@ -104,6 +114,31 @@ function buildHourly(
   );
 }
 
+/**
+ * 区間ウェイトを決める。
+ * 駅別乗降人員が全駅そろっていれば幾何平均モデル（segment-weight.ts）を使い、
+ * 欠けていれば現行の暫定按分（モックの peakRate 比）にフォールバックする。
+ */
+function resolveWeights(line: MockLine): {
+  weights: number[];
+  weightSource: WeightSource;
+} {
+  const passengers = getPassengers(line.id);
+  if (passengers && hasPassengerData(passengers, line.segments)) {
+    return {
+      weights: segmentWeightsFromPassengers(passengers, line.segments),
+      weightSource: "passengers",
+    };
+  }
+
+  // フォールバック：モックの区間 peakRate 比を最混雑区間=1.0 に正規化（暫定・作り物）。
+  const maxPeak = Math.max(...line.segments.map((s) => s.peakRate));
+  return {
+    weights: line.segments.map((s) => (maxPeak > 0 ? s.peakRate / maxPeak : 1)),
+    weightSource: "provisional",
+  };
+}
+
 /** 1 路線分の推定ラインを生成する（純関数・与えたオプションに対して決定的）。 */
 export function buildEstimatedLine(
   line: MockLine,
@@ -117,11 +152,10 @@ export function buildEstimatedLine(
     baselineRateForRailway(LINE_RAILWAY_ID[line.id] ?? "") ??
     FALLBACK_BASELINE_RATE;
 
-  // 区間ウェイト：モックの区間 peakRate 比を最混雑区間=1.0 に正規化（暫定按分）。
-  const maxPeak = Math.max(...line.segments.map((s) => s.peakRate));
+  const { weights, weightSource } = resolveWeights(line);
 
-  const segments: EstimatedSegment[] = line.segments.map((s) => {
-    const weight = maxPeak > 0 ? s.peakRate / maxPeak : 1;
+  const segments: EstimatedSegment[] = line.segments.map((s, i) => {
+    const weight = weights[i] ?? 1;
     const baselineRatePct = routeBase * weight;
     const hourly = buildHourly(baselineRatePct, dayKind, nowHour, delayMinutes);
     return {
@@ -143,6 +177,7 @@ export function buildEstimatedLine(
     color: line.color,
     stations: line.stations,
     baselineRatePct: routeBase,
+    weightSource,
     segments,
   };
 }

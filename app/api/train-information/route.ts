@@ -13,8 +13,23 @@ import {
   type TrainInfoResponse,
 } from "@/lib/mock/train-information";
 
-// ルートセグメントのキャッシュ（秒）。ODPT 負荷を抑えるため 30〜60 秒に収める。
-export const revalidate = 45;
+// ⚠️ ビルド時のプリレンダリング（静的化）を禁止する。
+// `export const revalidate` を置くと Next はこの GET をビルド時に実行して
+// レスポンスを .next に焼き込む。その結果、
+//   - キー未設定でビルド → モックの dc:date（ビルド時刻）が本番に固定される
+//   - キー設定済みでビルド → ビルド時点の運行情報が最初の訪問者に返る
+// となり「データ生成時刻を表示する」ライセンス要件が崩れる。
+// リクエスト時に必ずサーバで評価させる。
+export const dynamic = "force-dynamic";
+
+// ODPT 呼び出しのキャッシュ（秒）。fetch 側のデータキャッシュ + CDN の
+// s-maxage で ODPT への実リクエストを 30〜60 秒に 1 回へ抑える。
+const ODPT_REVALIDATE_SECONDS = 45;
+
+// CDN（Vercel Edge）に持たせるキャッシュ。ブラウザには持たせない。
+const CACHE_HEADERS = {
+  "Cache-Control": `public, s-maxage=${ODPT_REVALIDATE_SECONDS}, stale-while-revalidate=30`,
+} as const;
 
 const TARGET_OPERATORS: readonly {
   code: string;
@@ -59,8 +74,12 @@ function toItem(
 }
 
 export async function GET(): Promise<NextResponse<TrainInfoResponse>> {
+  // キー未設定（未設定のままデプロイした場合も含む）はモックで動かす。
+  // force-dynamic なのでこの判定はビルド時ではなくリクエスト時に走る。
   if (!process.env.ODPT_CONSUMER_KEY) {
-    return NextResponse.json(buildMockTrainInformation());
+    return NextResponse.json(buildMockTrainInformation(), {
+      headers: CACHE_HEADERS,
+    });
   }
 
   try {
@@ -69,7 +88,7 @@ export async function GET(): Promise<NextResponse<TrainInfoResponse>> {
         const raw = await odptFetch<OdptTrainInformation>(
           "odpt:TrainInformation",
           { "odpt:operator": op.code },
-          { next: { revalidate } }
+          { next: { revalidate: ODPT_REVALIDATE_SECONDS } }
         );
         return raw.map((r) => toItem(r, op.label));
       })
@@ -89,9 +108,11 @@ export async function GET(): Promise<NextResponse<TrainInfoResponse>> {
       attribution: ATTRIBUTION,
       items,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: CACHE_HEADERS });
   } catch {
-    // fetch 失敗時もアプリを止めず、デモデータで継続する
-    return NextResponse.json(buildMockTrainInformation());
+    // fetch 失敗（キー失効・ODPT 障害・レート制限）時もアプリを止めず、デモデータで継続する
+    return NextResponse.json(buildMockTrainInformation(), {
+      headers: CACHE_HEADERS,
+    });
   }
 }
