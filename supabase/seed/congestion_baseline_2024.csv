@@ -1,0 +1,6 @@
+railway_id,segment_label,dir,peak_time_band,capacity,ridership,congestion_rate,fiscal_year,source_url
+odpt.Railway:JR-East.Yamanote,上野→御徒町 (外回り),outbound,7:47-8:47,26032,34940,134,2024,https://www.mlit.go.jp/report/press/content/001904497.pdf
+odpt.Railway:JR-East.Yamanote,新大久保→新宿 (内回り),inbound,7:41-8:41,32540,45160,139,2024,https://www.mlit.go.jp/report/press/content/001904497.pdf
+odpt.Railway:JR-East.ChuoRapid,中野→新宿,inbound,7:35-8:35,41440,66720,161,2024,https://www.mlit.go.jp/report/press/content/001902900.pdf
+odpt.Railway:TokyoMetro.Tozai,木場→門前仲町,inbound,7:50-8:50,40500,60750,150,2024,https://www.mlit.go.jp/report/press/content/001902900.pdf
+odpt.Railway:TokyoMetro.Tozai,高田馬場→早稲田,outbound,8:00-9:00,34500,37950,110,2024,https://www.mlit.go.jp/report/press/content/001904497.pdf
