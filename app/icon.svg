@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="路線上の混雑度を表すアイコン">
+  <rect width="32" height="32" rx="7" fill="#ffffff" />
+  <rect x="5" y="15" width="22" height="4" rx="2" fill="#0f172a" />
+  <circle cx="9" cy="17" r="4" fill="#2e9e5b" stroke="#ffffff" stroke-width="1.5" />
+  <circle cx="16" cy="17" r="4" fill="#e6a817" stroke="#ffffff" stroke-width="1.5" />
+  <circle cx="23" cy="17" r="4" fill="#cb2e2e" stroke="#ffffff" stroke-width="1.5" />
+</svg>
